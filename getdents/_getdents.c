@@ -53,7 +53,7 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 		return NULL;
 	}
 
-	if (buff_size < MAXNAMLEN + sizeof(struct linux_dirent64)) {
+	if (buff_size < MIN_GETDENTS_BUFF_SIZE) {
 		PyErr_SetString(
 		    PyExc_ValueError,
 		    "buff_size is too small"
