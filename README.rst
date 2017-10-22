@@ -15,8 +15,6 @@ TODO
 
 * Verify that implementation works on platforms other than ``x86_64``.
 
-* Add python2 support.
-
 
 Install
 =======
