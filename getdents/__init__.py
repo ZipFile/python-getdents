@@ -15,16 +15,30 @@ from ._getdents import (  # noqa: ignore=F401
 )
 
 
-def getdents(path, buff_size=32768, close_fd=False):
-    if hasattr(path, 'fileno'):
-        fd = path.fileno()
-    elif isinstance(path, str):
-        fd = os.open(path, O_GETDENTS)
-        close_fd = True
-    elif isinstance(path, int):
-        fd = path
-    else:
-        raise TypeError('Unsupported type: %s', type(path))
+def getdents(path, buff_size=32768):
+    """Get directory entries.
+
+    Wrapper around getdents_raw(), simulates ls behaviour: ignores deleted
+    files, skips . and .. entries.
+
+    Note:
+       Default buffer size is 32k, it's a default allocation size of glibc's
+       readdir() implementation.
+
+    Note:
+       Larger buffer will result in a fewer syscalls, so for really large
+       dirs you should pick larger value.
+
+    Note:
+       For better performance, set buffer size to be multiple of your block
+       size for filesystem I/O.
+
+    Args:
+        path (str): Location of the directory.
+        buff_size (int): Buffer size in bytes for getdents64 syscall.
+    """
+
+    fd = os.open(path, O_GETDENTS)
 
     try:
         yield from (
@@ -33,5 +47,4 @@ def getdents(path, buff_size=32768, close_fd=False):
             if not(type == DT_UNKNOWN or inode == 0 or name in ('.', '..'))
         )
     finally:
-        if close_fd:
-            os.close(fd)
+        os.close(fd)

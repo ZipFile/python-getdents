@@ -2,7 +2,7 @@ import os
 
 from unittest.mock import ANY
 
-from pytest import fixture, mark, raises
+from pytest import fixture, raises
 
 from getdents._getdents import (
     DT_DIR,
@@ -45,10 +45,9 @@ def test_small_buffer(fixt_dir):
         getdents_raw(fixt_dir, MIN_GETDENTS_BUFF_SIZE - 1)
 
 
-@mark.skip(reason='No idea how to test this properly')
 def test_malloc_fail(fixt_dir):
     with raises(MemoryError):
-        getdents_raw(fixt_dir, 2**63)
+        getdents_raw(fixt_dir, 1 << 62)
 
 
 def test_getdents_raw(fixt_dir):

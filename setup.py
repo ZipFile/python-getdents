@@ -7,7 +7,7 @@ from distutils.core import Extension
 
 setup(
     name='getdents',
-    version='0.1',
+    version='0.2',
     description='Python binding to linux syscall getdents64.',
     long_description=open('README.rst').read(),
     classifiers=[
