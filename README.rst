@@ -19,14 +19,14 @@ TODO
 Install
 =======
 
-.. code-block:: python
+.. code-block:: sh
 
     pip install getdents
 
 For development
 ---------------
 
-.. code-block:: python
+.. code-block:: sh
 
     python3 -m venv env
     . env/bin/activate
@@ -35,9 +35,15 @@ For development
 Run tests
 =========
 
-.. code-block:: python
+.. code-block:: sh
 
-    ./setup.py test
+    ulimit -v 33554432 && py.test tests/
+
+Or
+
+.. code-block:: sh
+
+    ulimit -v 33554432 && ./setup.py test
 
 Usage
 =====
