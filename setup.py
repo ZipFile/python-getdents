@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-from setuptools import setup
-
 from distutils.core import Extension
+
+from setuptools import setup
 
 
 setup(
@@ -25,7 +25,7 @@ setup(
     packages=['getdents'],
     include_package_data=True,
     zip_safe=False,
-    ext_modules = [
+    ext_modules=[
         Extension('getdents._getdents', sources=['getdents/_getdents.c']),
     ],
     setup_requires=['pytest-runner'],
