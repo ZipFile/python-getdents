@@ -28,9 +28,6 @@ setup(
     ext_modules = [
         Extension('getdents._getdents', sources=['getdents/_getdents.c']),
     ],
-    install_requires=[
-      'setuptools',
-    ],
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
 )
