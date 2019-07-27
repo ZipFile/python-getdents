@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-from distutils.core import Extension
+from setuptools import Extension, find_packages, setup
 
-from setuptools import setup
 
+tests_require = ['pytest', 'pretend']
 
 setup(
     name='getdents',
-    version='0.2',
+    version='0.3',
     description='Python binding to linux syscall getdents64.',
     long_description=open('README.rst').read(),
     classifiers=[
@@ -22,12 +22,18 @@ setup(
     author_email='lin.aaa.lin@gmail.com',
     url='http://github.com/ZipFile/python-getdents',
     license='BSD-2-Clause',
-    packages=['getdents'],
+    packages=find_packages(exclude=['tests']),
     include_package_data=True,
     zip_safe=False,
+    extras_require={
+        'test': tests_require,
+    },
     ext_modules=[
         Extension('getdents._getdents', sources=['getdents/_getdents.c']),
     ],
+    entry_points = {
+        'console_scripts': ['python-getdents=getdents.cli:main'],
+    },
     setup_requires=['pytest-runner'],
-    tests_require=['pytest'],
+    tests_require=tests_require,
 )
