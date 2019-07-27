@@ -1,5 +1,5 @@
 import os
-
+import sys
 from unittest.mock import ANY
 
 from pytest import fixture, raises
@@ -47,7 +47,7 @@ def test_small_buffer(fixt_dir):
 
 def test_malloc_fail(fixt_dir):
     with raises(MemoryError):
-        getdents_raw(fixt_dir, 1 << 62)
+        getdents_raw(fixt_dir, sys.maxsize)
 
 
 def test_getdents_raw(fixt_dir):
