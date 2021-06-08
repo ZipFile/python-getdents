@@ -7,7 +7,7 @@ tests_require = ['pytest', 'pretend']
 
 setup(
     name='getdents',
-    version='0.3',
+    version='0.3.1',
     description='Python binding to linux syscall getdents64.',
     long_description=open('README.rst').read(),
     classifiers=[
