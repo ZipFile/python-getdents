@@ -24,6 +24,7 @@ setup(
     license='BSD-2-Clause',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
+    package_data={'getdents': ['py.typed']},
     zip_safe=False,
     extras_require={
         'test': tests_require,

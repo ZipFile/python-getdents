@@ -1,4 +1,5 @@
 import re
+from sys import stdout
 
 import pretend
 
@@ -40,7 +41,7 @@ def test_main(monkeypatch):
     directory_entries = pretend.stub()
 
     @pretend.call_recorder
-    def format_test(directory_entries):
+    def format_test(directory_entries, file):
         pass
 
     @pretend.call_recorder
@@ -52,7 +53,7 @@ def test_main(monkeypatch):
 
     assert main(['x', '-o', 'test', '-b', '1024'], 'test') == 0
     assert getdents.calls == [pretend.call('x', buff_size=1024)]
-    assert format_test.calls == [pretend.call(directory_entries)]
+    assert format_test.calls == [pretend.call(directory_entries, stdout)]
 
 
 def test_main_memory_error(monkeypatch):

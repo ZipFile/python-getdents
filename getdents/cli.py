@@ -1,11 +1,15 @@
 from argparse import ArgumentParser
-from sys import stderr
+from sys import stderr, stdout
+from typing import List, Optional, Tuple
 
 from . import MIN_GETDENTS_BUFF_SIZE, getdents
-from .formatters import FORMATTERS
+from .formatters import FORMATTERS, Formatter
 
 
-def parse_args(args, prog):
+def parse_args(
+    args: Optional[List[str]],
+    prog: Optional[str],
+) -> Tuple[str, int, Formatter]:
     parser = ArgumentParser(
         prog=prog,
         description='Print directory contents.',
@@ -38,11 +42,11 @@ def parse_args(args, prog):
     return parsed_args.path, buff_size, FORMATTERS[parsed_args.output_format]
 
 
-def main(args=None, prog=None):
+def main(args: Optional[List[str]] = None, prog: Optional[str] = None) -> int:
     path, buff_size, fmt = parse_args(args, prog)
 
     try:
-        fmt(getdents(path, buff_size=buff_size))
+        fmt(getdents(path, buff_size=buff_size), stdout)
     except MemoryError:
         print(
             'Not enough memory to allocate', buff_size, 'bytes of data',

@@ -1,6 +1,7 @@
 import os
+from typing import Iterator, Tuple
 
-from ._getdents import (  # noqa: ignore=F401
+from ._getdents import (
     DT_BLK,
     DT_CHR,
     DT_DIR,
@@ -14,8 +15,10 @@ from ._getdents import (  # noqa: ignore=F401
     getdents_raw,
 )
 
+DirectoryEntry = Tuple[int, int, str]
 
-def getdents(path, buff_size=32768):
+
+def getdents(path: str, buff_size: int = 32768) -> Iterator[DirectoryEntry]:
     """Get directory entries.
 
     Wrapper around getdents_raw(), simulates ls behaviour: ignores deleted
@@ -48,3 +51,19 @@ def getdents(path, buff_size=32768):
         )
     finally:
         os.close(fd)
+
+
+__all__ = [
+    'DT_BLK',
+    'DT_CHR',
+    'DT_DIR',
+    'DT_FIFO',
+    'DT_LNK',
+    'DT_REG',
+    'DT_SOCK',
+    'DT_UNKNOWN',
+    'MIN_GETDENTS_BUFF_SIZE',
+    'O_GETDENTS',
+    'getdents',
+    'getdents_raw',
+]
