@@ -16,19 +16,19 @@ from . import (
     DirectoryEntry,
 )
 
-
 Formatter = Callable[[Iterable[DirectoryEntry], TextIO], None]
-HEADER = ('inode', 'type', 'name')
-FORMATTERS: Dict[str, Formatter] = {}
+FormatterRegistry = Dict[str, Formatter]
+HEADER = ("inode", "type", "name")
+FORMATTERS: FormatterRegistry = {}
 TYPE_NAMES = {
-    DT_BLK: 'blk',
-    DT_CHR: 'chr',
-    DT_DIR: 'dir',
-    DT_FIFO: 'fifo',
-    DT_LNK: 'lnk',
-    DT_REG: 'reg',
-    DT_SOCK: 'sock',
-    DT_UNKNOWN: 'unknown',
+    DT_BLK: "blk",
+    DT_CHR: "chr",
+    DT_DIR: "dir",
+    DT_FIFO: "fifo",
+    DT_LNK: "lnk",
+    DT_REG: "reg",
+    DT_SOCK: "sock",
+    DT_UNKNOWN: "unknown",
 }
 
 
@@ -39,10 +39,11 @@ def formatter(
     def deco(fn: Formatter) -> Formatter:
         registry[name] = fn
         return fn
+
     return deco
 
 
-@formatter('plain')
+@formatter("plain")
 def format_plain(
     directory_entries: Iterable[DirectoryEntry],
     file: TextIO = stdout,
@@ -65,16 +66,17 @@ def _format_csv(
 
     for first in directory_entries:
         if headers:
-            print(writer.writerow(HEADER), end='', file=file)
+            print(writer.writerow(HEADER), end="", file=file)
 
         for inode, type, name in chain((first,), directory_entries):
             print(
                 writer.writerow((inode, TYPE_NAMES[type], name)),
-                end='', file=file,
+                end="",
+                file=file,
             )
 
 
-@formatter('csv')
+@formatter("csv")
 def format_csv(
     directory_entries: Iterable[DirectoryEntry],
     file: TextIO = stdout,
@@ -82,7 +84,7 @@ def format_csv(
     return _format_csv(directory_entries, file, False)
 
 
-@formatter('csv-headers')
+@formatter("csv-headers")
 def format_csv_headers(
     directory_entries: Iterable[DirectoryEntry],
     file: TextIO = stdout,
@@ -91,34 +93,42 @@ def format_csv_headers(
 
 
 def json_encode(inode: int, type: int, name: str) -> str:
-    return json_dumps({
-        'inode': inode,
-        'type': TYPE_NAMES[type],
-        'name': name,
-    })
+    return json_dumps(
+        {
+            "inode": inode,
+            "type": TYPE_NAMES[type],
+            "name": name,
+        }
+    )
 
 
-@formatter('json')
+@formatter("json")
 def format_json(
     directory_entries: Iterable[DirectoryEntry],
     file: TextIO = stdout,
 ) -> None:
     for inode, type, name in directory_entries:
         print(
-            '[\n', json_encode(inode, type, name),
-            sep='', end='', file=file,
+            "[\n",
+            json_encode(inode, type, name),
+            sep="",
+            end="",
+            file=file,
         )
 
         for inode, type, name in directory_entries:
             print(
-                ',\n', json_encode(inode, type, name),
-                sep='', end='', file=file,
+                ",\n",
+                json_encode(inode, type, name),
+                sep="",
+                end="",
+                file=file,
             )
 
-        print('\n]', file=file)
+        print("\n]", file=file)
 
 
-@formatter('json-stream')
+@formatter("json-stream")
 def format_json_stream(
     directory_entries: Iterable[DirectoryEntry],
     file: TextIO = stdout,

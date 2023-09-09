@@ -12,32 +12,32 @@ def parse_args(
 ) -> Tuple[str, int, Formatter]:
     parser = ArgumentParser(
         prog=prog,
-        description='Print directory contents.',
+        description="Print directory contents.",
     )
 
-    parser.add_argument('path', metavar='PATH')
+    parser.add_argument("path", metavar="PATH")
     parser.add_argument(
-        '-b', '--buffer-size',
-        metavar='N',
+        "-b",
+        "--buffer-size",
+        metavar="N",
         type=int,
         default=32768,
-        help=(
-            'Buffer size (in bytes) to allocate when iterating over directory'
-        ),
+        help=("Buffer size (in bytes) to allocate when iterating over directory"),
     )
     parser.add_argument(
-        '-o', '--output-format',
-        metavar='NAME',
-        default='plain',
+        "-o",
+        "--output-format",
+        metavar="NAME",
+        default="plain",
         choices=list(FORMATTERS),
-        help='Output format: %s' % ', '.join(sorted(FORMATTERS)),
+        help="Output format: %s" % ", ".join(sorted(FORMATTERS)),
     )
 
     parsed_args = parser.parse_args(args)
     buff_size = parsed_args.buffer_size
 
     if buff_size < MIN_GETDENTS_BUFF_SIZE:
-        parser.error('Minimum buffer size is %s' % MIN_GETDENTS_BUFF_SIZE)
+        parser.error("Minimum buffer size is %s" % MIN_GETDENTS_BUFF_SIZE)
 
     return parsed_args.path, buff_size, FORMATTERS[parsed_args.output_format]
 
@@ -49,7 +49,9 @@ def main(args: Optional[List[str]] = None, prog: Optional[str] = None) -> int:
         fmt(getdents(path, buff_size=buff_size), stdout)
     except MemoryError:
         print(
-            'Not enough memory to allocate', buff_size, 'bytes of data',
+            "Not enough memory to allocate",
+            buff_size,
+            "bytes of data",
             file=stderr,
         )
         return 3

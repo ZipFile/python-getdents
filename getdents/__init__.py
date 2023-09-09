@@ -47,23 +47,24 @@ def getdents(path: str, buff_size: int = 32768) -> Iterator[DirectoryEntry]:
         yield from (
             (inode, type, name)
             for inode, type, name in getdents_raw(fd, buff_size)
-            if not(type == DT_UNKNOWN or inode == 0 or name in ('.', '..'))
+            if not (type == DT_UNKNOWN or inode == 0 or name in (".", ".."))
         )
     finally:
         os.close(fd)
 
 
 __all__ = [
-    'DT_BLK',
-    'DT_CHR',
-    'DT_DIR',
-    'DT_FIFO',
-    'DT_LNK',
-    'DT_REG',
-    'DT_SOCK',
-    'DT_UNKNOWN',
-    'MIN_GETDENTS_BUFF_SIZE',
-    'O_GETDENTS',
-    'getdents',
-    'getdents_raw',
+    "DT_BLK",
+    "DT_CHR",
+    "DT_DIR",
+    "DT_FIFO",
+    "DT_LNK",
+    "DT_REG",
+    "DT_SOCK",
+    "DT_UNKNOWN",
+    "MIN_GETDENTS_BUFF_SIZE",
+    "O_GETDENTS",
+    "DirectoryEntry",
+    "getdents",
+    "getdents_raw",
 ]
