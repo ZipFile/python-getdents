@@ -24,7 +24,6 @@ struct getdents_state {
 	int    fd;
 	int    nread;
 	size_t buff_size;
-	bool   ready_for_next_batch;
 };
 
 
@@ -76,7 +75,6 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 	state->fd = fd;
 	state->bpos = 0;
 	state->nread = 0;
-	state->ready_for_next_batch = true;
 	return (PyObject *) state;
 }
 
@@ -90,9 +88,7 @@ getdents_dealloc(struct getdents_state *state)
 static PyObject *
 getdents_next(struct getdents_state *s)
 {
-	s->ready_for_next_batch = s->bpos >= s->nread;
-
-	if (s->ready_for_next_batch) {
+	if (s->bpos >= s->nread) {
 		s->bpos = 0;
 		s->nread = syscall(SYS_getdents64, s->fd, s->buff, s->buff_size);
 
