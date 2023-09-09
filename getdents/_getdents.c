@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -32,7 +33,11 @@ struct getdents_state {
 #endif
 
 #ifndef MIN_GETDENTS_BUFF_SIZE
-# define MIN_GETDENTS_BUFF_SIZE (MAXNAMLEN + sizeof(struct linux_dirent64))
+# ifdef NAME_MAX
+#  define MIN_GETDENTS_BUFF_SIZE (NAME_MAX + sizeof(struct linux_dirent64))
+# else
+#  define MIN_GETDENTS_BUFF_SIZE (MAXNAMLEN + sizeof(struct linux_dirent64))
+# endif
 #endif
 
 static PyObject *
