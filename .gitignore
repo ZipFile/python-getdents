@@ -25,6 +25,7 @@ parts/
 sdist/
 var/
 wheels/
+wheelhouse/
 pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
@@ -129,4 +130,6 @@ dmypy.json
 .pyre/
 
 # End of https://www.gitignore.io/api/python
+
+.idea/
 
