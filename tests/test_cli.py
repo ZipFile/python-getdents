@@ -1,5 +1,6 @@
 import re
 from sys import stdout
+from typing import List, Tuple
 from unittest.mock import Mock
 
 from pytest import CaptureFixture, MonkeyPatch, mark, raises
@@ -32,7 +33,7 @@ from getdents.formatters import (
         ),
     ],
 )
-def test_parse_args(args: list[str], expected: tuple[str, int, Formatter]) -> None:
+def test_parse_args(args: List[str], expected: Tuple[str, int, Formatter]) -> None:
     assert parse_args(args, "test") == expected
 
 
