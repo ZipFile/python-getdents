@@ -1,7 +1,6 @@
 import re
 from sys import stdout
-
-import pretend
+from unittest.mock import Mock
 
 from pytest import mark, raises
 
@@ -38,49 +37,44 @@ def test_parse_args_min_buff_size(capsys):
 
 
 def test_main(monkeypatch):
-    directory_entries = pretend.stub()
-
-    @pretend.call_recorder
-    def format_test(directory_entries, file):
-        pass
-
-    @pretend.call_recorder
-    def getdents(path, buff_size=32768):
-        return directory_entries
+    format_test = Mock()
+    getdents = Mock()
+    directory_entries = getdents.return_value
 
     monkeypatch.setitem(FORMATTERS, 'test', format_test)
     monkeypatch.setattr(cli, 'getdents', getdents)
 
     assert main(['x', '-o', 'test', '-b', '1024'], 'test') == 0
-    assert getdents.calls == [pretend.call('x', buff_size=1024)]
-    assert format_test.calls == [pretend.call(directory_entries, stdout)]
+
+    getdents.assert_called_once_with('x', buff_size=1024)
+    format_test.assert_called_once_with(directory_entries, stdout)
 
 
 def test_main_memory_error(monkeypatch):
-    monkeypatch.setattr(cli, 'getdents', pretend.raiser(MemoryError))
+    monkeypatch.setattr(cli, 'getdents', Mock(side_effect=MemoryError))
 
     assert main(['x']) == 3
 
 
 def test_main_file_not_found_error(monkeypatch):
-    monkeypatch.setattr(cli, 'getdents', pretend.raiser(FileNotFoundError))
+    monkeypatch.setattr(cli, 'getdents', Mock(side_effect=FileNotFoundError))
 
     assert main(['x']) == 4
 
 
 def test_main_not_a_directory_error(monkeypatch):
-    monkeypatch.setattr(cli, 'getdents', pretend.raiser(NotADirectoryError))
+    monkeypatch.setattr(cli, 'getdents', Mock(side_effect=NotADirectoryError))
 
     assert main(['x']) == 5
 
 
 def test_main_permission_error(monkeypatch):
-    monkeypatch.setattr(cli, 'getdents', pretend.raiser(PermissionError))
+    monkeypatch.setattr(cli, 'getdents', Mock(side_effect=PermissionError))
 
     assert main(['x']) == 6
 
 
 def test_main_os_error(monkeypatch):
-    monkeypatch.setattr(cli, 'getdents', pretend.raiser(OSError))
+    monkeypatch.setattr(cli, 'getdents', Mock(side_effect=OSError))
 
     assert main(['x']) == 7

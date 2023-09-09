@@ -3,7 +3,7 @@
 from setuptools import Extension, find_packages, setup
 
 
-tests_require = ['pytest', 'pretend']
+tests_require = ['pytest']
 
 setup(
     name='getdents',
