@@ -65,7 +65,11 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 		return NULL;
 	}
 
-	struct getdents_state *state = (void *) type->tp_alloc(type, 0);
+	allocfunc tp_alloc = PyType_GetSlot(type, Py_tp_alloc);
+
+	assert(tp_alloc != NULL);
+
+	struct getdents_state *state = (void *) tp_alloc(type, 0);
 
 	if (!state)
 		return NULL;
@@ -86,8 +90,14 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 static void
 getdents_dealloc(struct getdents_state *state)
 {
+	PyTypeObject *tp = Py_TYPE(state);
+	freefunc tp_free = PyType_GetSlot(tp, Py_tp_free);
+
+	assert(tp_free != NULL);
+
 	free(state->buff);
-	Py_TYPE(state)->tp_free(state);
+	tp_free(state);
+	Py_DECREF(tp);
 }
 
 static PyObject *
@@ -117,67 +127,43 @@ getdents_next(struct getdents_state *s)
 	return result;
 }
 
-PyTypeObject getdents_type = {
-	PyVarObject_HEAD_INIT(NULL, 0)
-	"getdents_raw",                 /* tp_name */
-	sizeof(struct getdents_state),  /* tp_basicsize */
-	0,                              /* tp_itemsize */
-	(destructor) getdents_dealloc,  /* tp_dealloc */
-	0,                              /* tp_print */
-	0,                              /* tp_getattr */
-	0,                              /* tp_setattr */
-	0,                              /* tp_reserved */
-	0,                              /* tp_repr */
-	0,                              /* tp_as_number */
-	0,                              /* tp_as_sequence */
-	0,                              /* tp_as_mapping */
-	0,                              /* tp_hash */
-	0,                              /* tp_call */
-	0,                              /* tp_str */
-	0,                              /* tp_getattro */
-	0,                              /* tp_setattro */
-	0,                              /* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,             /* tp_flags */
-	0,                              /* tp_doc */
-	0,                              /* tp_traverse */
-	0,                              /* tp_clear */
-	0,                              /* tp_richcompare */
-	0,                              /* tp_weaklistoffset */
-	PyObject_SelfIter,              /* tp_iter */
-	(iternextfunc) getdents_next,   /* tp_iternext */
-	0,                              /* tp_methods */
-	0,                              /* tp_members */
-	0,                              /* tp_getset */
-	0,                              /* tp_base */
-	0,                              /* tp_dict */
-	0,                              /* tp_descr_get */
-	0,                              /* tp_descr_set */
-	0,                              /* tp_dictoffset */
-	0,                              /* tp_init */
-	PyType_GenericAlloc,            /* tp_alloc */
-	getdents_new,                   /* tp_new */
+static PyType_Slot getdents_type_slots[] = {
+	{Py_tp_alloc, PyType_GenericAlloc},
+	{Py_tp_dealloc, getdents_dealloc},
+	{Py_tp_iter, PyObject_SelfIter},
+	{Py_tp_iternext, getdents_next},
+	{Py_tp_new, getdents_new},
+	{0, 0},
+};
+
+static PyType_Spec getdents_type_spec = {
+	.name = "getdents.getdents_raw",
+	.basicsize = sizeof(struct getdents_state),
+	.flags = Py_TPFLAGS_DEFAULT,
+	.slots = getdents_type_slots,
 };
 
 static struct PyModuleDef getdents_module = {
 	PyModuleDef_HEAD_INIT,
-	"getdents",                      /* m_name */
-	"",                              /* m_doc */
-	-1,                              /* m_size */
+	.m_name = "getdents",
+	.m_doc = "",
+	.m_size = -1,
 };
 
 PyMODINIT_FUNC
 PyInit__getdents(void)
 {
-	if (PyType_Ready(&getdents_type) < 0)
-		return NULL;
-
 	PyObject *module = PyModule_Create(&getdents_module);
 
 	if (!module)
 		return NULL;
 
-	Py_INCREF(&getdents_type);
-	PyModule_AddObject(module, "getdents_raw", (PyObject *) &getdents_type);
+	PyObject *getdents_raw = PyType_FromSpec(&getdents_type_spec);
+
+	if (!getdents_raw)
+		return NULL;
+
+	PyModule_AddObject(module, "getdents_raw", getdents_raw);
 	PyModule_AddIntMacro(module, DT_BLK);
 	PyModule_AddIntMacro(module, DT_CHR);
 	PyModule_AddIntMacro(module, DT_DIR);
