@@ -51,16 +51,16 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 
 	if (!(fcntl(fd, F_GETFL) & O_DIRECTORY)) {
 		PyErr_SetString(
-		    PyExc_NotADirectoryError,
-		    "fd must be opened with O_DIRECTORY flag"
+			PyExc_NotADirectoryError,
+			"fd must be opened with O_DIRECTORY flag"
 		);
 		return NULL;
 	}
 
 	if (buff_size < MIN_GETDENTS_BUFF_SIZE) {
 		PyErr_SetString(
-		    PyExc_ValueError,
-		    "buff_size is too small"
+			PyExc_ValueError,
+			"buff_size is too small"
 		);
 		return NULL;
 	}
