@@ -7,3 +7,6 @@ trim_trailing_whitespace = true
 
 [*.py]
 ij_visual_guides = 80,88
+
+[*.c]
+indent_style = tab
