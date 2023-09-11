@@ -30,6 +30,14 @@ For development
     . env/bin/activate
     pip install -e .[test]
 
+Building Wheels
+~~~~~~~~~~~~~~~
+
+.. code-block:: sh
+
+    pip install cibuildwheel
+    cibuildwheel --platform linux --output-dir wheelhouse
+
 Run tests
 =========
 

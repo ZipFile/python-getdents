@@ -69,3 +69,14 @@ target-version = ["py38", "py39", "py310", "py311"]
 [tool.mypy]
 strict = true
 warn_unused_configs = true
+
+[tool.cibuildwheel]
+archs = ["native"]
+test-command = "pytest --import-mode=importlib -p no:cacheprovider {project}/tests"
+test-requires = ["pytest", "pytest-cov"]
+
+[tool.cibuildwheel.linux]
+repair-wheel-command = [
+    "auditwheel repair -w {dest_dir} {wheel}",
+    "if [[ {wheel} =~ -abi3-.*\\.whl ]]; then pipx run abi3audit --strict --report {wheel}; fi",
+]
