@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "wheel"]
+requires = ["setuptools", "wheel"]
 
 [project]
 name = "getdents"
@@ -40,10 +40,11 @@ dev = [
 packages = ["getdents"]
 include-package-data = true
 
+[tool.setuptools.dynamic]
+version = {attr = "getdents.__version__"}
+
 [tool.setuptools.package-data]
 getdents = ["py.typed"]
-
-[tool.setuptools_scm]
 
 [tool.pytest.ini_options]
 addopts = "--cov"
