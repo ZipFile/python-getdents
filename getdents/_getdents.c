@@ -19,12 +19,11 @@ struct linux_dirent64 {
 };
 
 struct getdents_state {
-	PyObject_HEAD
-	char  *buff;
+	PyObject_VAR_HEAD
 	int    bpos;
 	int    fd;
 	int    nread;
-	size_t buff_size;
+	char   buff[];
 };
 
 
@@ -40,7 +39,7 @@ struct getdents_state {
 # endif
 #endif
 
-static PyObject *
+static PyVarObject *
 getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 {
 	size_t buff_size;
@@ -69,22 +68,15 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 
 	assert(tp_alloc != NULL);
 
-	struct getdents_state *state = (void *) tp_alloc(type, 0);
+	struct getdents_state *state = (void *) tp_alloc(type, buff_size);
 
 	if (!state)
 		return NULL;
 
-	void *buff = malloc(buff_size);
-
-	if (!buff)
-		return PyErr_NoMemory();
-
-	state->buff = buff;
-	state->buff_size = buff_size;
 	state->fd = fd;
 	state->bpos = 0;
 	state->nread = 0;
-	return (PyObject *) state;
+	return (PyVarObject *) state;
 }
 
 static void
@@ -95,7 +87,6 @@ getdents_dealloc(struct getdents_state *state)
 
 	assert(tp_free != NULL);
 
-	free(state->buff);
 	tp_free(state);
 	Py_DECREF(tp);
 }
@@ -105,7 +96,7 @@ getdents_next(struct getdents_state *s)
 {
 	if (s->bpos >= s->nread) {
 		s->bpos = 0;
-		s->nread = syscall(SYS_getdents64, s->fd, s->buff, s->buff_size);
+		s->nread = syscall(SYS_getdents64, s->fd, s->buff, Py_SIZE(s));
 
 		if (s->nread == 0)
 			return NULL;
@@ -139,6 +130,7 @@ static PyType_Slot getdents_type_slots[] = {
 static PyType_Spec getdents_type_spec = {
 	.name = "getdents.getdents_raw",
 	.basicsize = sizeof(struct getdents_state),
+	.itemsize = sizeof(char),
 	.flags = Py_TPFLAGS_DEFAULT,
 	.slots = getdents_type_slots,
 };
