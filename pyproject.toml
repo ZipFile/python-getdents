@@ -41,7 +41,7 @@ packages = ["getdents"]
 include-package-data = true
 
 [tool.setuptools.dynamic]
-version = {attr = "getdents.__version__"}
+version = {attr = "getdents.__about__.__version__"}
 
 [tool.setuptools.package-data]
 getdents = ["py.typed"]

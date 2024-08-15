@@ -53,7 +53,6 @@ def getdents(path: str, buff_size: int = 32768) -> Iterator[DirectoryEntry]:
         os.close(fd)
 
 
-__version__ = "0.4.0"
 __all__ = [
     "DT_BLK",
     "DT_CHR",
