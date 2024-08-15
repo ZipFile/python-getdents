@@ -74,7 +74,7 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 	if (!state)
 		return NULL;
 
-	void *buff = malloc(buff_size);
+	void *buff = PyMem_Malloc(buff_size);
 
 	if (!buff)
 		return PyErr_NoMemory();
@@ -95,7 +95,7 @@ getdents_dealloc(struct getdents_state *state)
 
 	assert(tp_free != NULL);
 
-	free(state->buff);
+	PyMem_Free(state->buff);
 	tp_free(state);
 	Py_DECREF(tp);
 }
