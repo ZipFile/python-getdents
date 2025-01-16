@@ -11,29 +11,40 @@ on:
     - published
 
 jobs:
-  build:
-    name: Build
+  build-sdist:
+    name: Build source distribution
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Build sdist
       run: pipx run build --sdist
-    - name: Build wheels
-      uses: pypa/cibuildwheel@v2.22.0
-    - name: Prepare for artifact upload
-      run: |
-        mkdir out
-        mv -t out dist/*.tar.gz
-        mv -t out wheelhouse/*.whl
     - uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
         compression-level: 0
-        path: out/
+        name: cibw-sdist
+        path: dist/*.tar.gz
+
+  build-wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v2.22.0
+    - uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: error
+        compression-level: 0
+        name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+        path: ./wheelhouse/*.whl
 
   test-pypi-publish:
     name: Upload release to TestPyPI
-    needs: [build]
+    needs: [build-sdist, build-wheels]
     runs-on: ubuntu-latest
     environment: test-pypi
     permissions:
@@ -42,8 +53,9 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        name: artifact
+        pattern: cibw-*
         path: dist
+        merge-multiple: true
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
@@ -51,7 +63,7 @@ jobs:
 
   pypi-publish:
     name: Upload release to PyPI
-    needs: [build, test-pypi-publish]
+    needs: [build-sdist, build-wheels, test-pypi-publish]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -60,7 +72,8 @@ jobs:
     steps:
     - uses: actions/download-artifact@v4
       with:
-        name: artifact
+        pattern: cibw-*
         path: dist
+        merge-multiple: true
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
