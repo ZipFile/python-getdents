@@ -12,4 +12,5 @@ indent_size = 2
 ij_visual_guides = 80,88
 
 [*.c]
+ij_visual_guides = 79
 indent_style = tab
