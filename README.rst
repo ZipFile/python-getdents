@@ -7,12 +7,9 @@ Iterate large directories efficiently with python.
 About
 =====
 
-``python-getdents`` is a simple wrapper around Linux system call ``getdents64`` (see ``man getdents`` for details). `More details <http://be-n.com/spw/you-can-list-a-million-files-in-a-directory-but-not-with-ls.html>`_ on approach.
+``python-getdents`` is a simple wrapper around Linux system call ``getdents64`` (see ``man getdents`` for details).
 
-TODO
-====
-
-* Verify that implementation works on platforms other than ``x86_64``.
+Implementation is based on solution descibed in `You can list a directory containing 8 million files! But not with ls. <http://be-n.com/spw/you-can-list-a-million-files-in-a-directory-but-not-with-ls.html>`_ article by Ben Congleton.
 
 Install
 =======
@@ -45,12 +42,6 @@ Run tests
 
     ulimit -v 33554432 && py.test tests/
 
-Or
-
-.. code-block:: sh
-
-    ulimit -v 33554432 && ./setup.py test
-
 Usage
 =====
 
@@ -58,37 +49,47 @@ Usage
 
     from getdents import getdents
 
-    for inode, type, name in getdents('/tmp', 32768):
+    for inode, type_, name in getdents("/tmp"):
         print(name)
 
 Advanced
 --------
 
+While ``getdents`` provides a convenient wrapper with ls-like filtering, you can use ``getdents_raw`` for more control:
+
 .. code-block:: python
 
     import os
-    from getdents import *
+    from getdents import DT_LNK, O_GETDENTS, getdents_raw
 
-    fd = os.open('/tmp', O_GETDENTS)
+    fd = os.open("/tmp", O_GETDENTS)
 
-    for inode, type, name in getdents_raw(fd, 2**20):
-        print({
-                DT_BLK:     'blockdev',
-                DT_CHR:     'chardev ',
-                DT_DIR:     'dir     ',
-                DT_FIFO:    'pipe    ',
-                DT_LNK:     'symlink ',
-                DT_REG:     'file    ',
-                DT_SOCK:    'socket  ',
-                DT_UNKNOWN: 'unknown ',
-            }[type], {
-                True:  'd',
-                False: ' ',
-            }[inode == 0],
-            name,
-        )
+    for inode, type_, name in getdents_raw(fd, 2**20):
+        if type_ == DT_LNK and inode != 0:
+            print("found symlink:", name, "->", os.readlink(name, dir_fd=fd))
 
     os.close(fd)
+
+Batching
+~~~~~~~~
+
+In case you need more control over syscalls, you may call instance of ``getdents_raw`` instead.
+Each call corresponds to single ``getdents64`` syscall, returning list of hovever many entries fits in buffer size.
+Call returns ``None`` when there are no more entries to read.
+
+.. code-block:: python
+
+    it = getdents_raw(fd, 2**20)
+
+    for batch in iter(it, None):
+         for inode, type, name in batch:
+            ...
+
+Free-threading
+~~~~~~~~~~~~~~
+
+While it is not so wise idea to do an I/O from multiple threads on a single file descriptor, you can do it if you need to.
+This package supports free-threading (nogil) in Python.
 
 CLI
 ---

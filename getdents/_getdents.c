@@ -25,8 +25,10 @@ struct getdents_state {
 	int    fd;
 	int    nread;
 	size_t buff_size;
+#ifdef Py_GIL_DISABLED
+	PyMutex lock;
+#endif
 };
-
 
 #ifndef O_GETDENTS
 # define O_GETDENTS (O_DIRECTORY | O_RDONLY | O_NONBLOCK | O_CLOEXEC)
@@ -40,14 +42,81 @@ struct getdents_state {
 # endif
 #endif
 
+#ifdef Py_GIL_DISABLED
+# define LOCK(s) PyMutex_Lock(&(s)->lock);
+# define UNLOCK(s) PyMutex_Unlock(&(s)->lock);
+#else
+# define LOCK(s)
+# define UNLOCK(s)
+#endif
+
+static inline bool has_next(struct getdents_state *self) {
+	return self->bpos < self->nread;
+}
+
+static inline int _count(struct getdents_state *self) {
+	struct linux_dirent64 *d;
+	int bpos = self->bpos;
+	int count = 0;
+
+	while (bpos < self->nread) {
+		d = (void *)(self->buff + bpos);
+		bpos += d->d_reclen;
+		count++;
+	}
+
+	return count;
+}
+
+static inline struct linux_dirent64 *_next(struct getdents_state *self) {
+	struct linux_dirent64 *dirent = (void *)(self->buff + self->bpos);
+	self->bpos += dirent->d_reclen;
+	return dirent;
+}
+
+static inline void _refill(struct getdents_state *self) {
+	self->bpos = 0;
+	Py_BEGIN_ALLOW_THREADS
+	self->nread = syscall(
+		SYS_getdents64,
+		self->fd,
+		self->buff,
+		self->buff_size
+	);
+	Py_END_ALLOW_THREADS
+}
+
 static PyObject *
-getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
+dirent64_to_python(struct linux_dirent64 *d)
+{
+	assert(d != NULL);
+
+	PyObject *py_name = PyUnicode_DecodeFSDefaultAndSize(
+		d->d_name,
+		strnlen(
+			d->d_name,
+			d->d_reclen - offsetof(struct linux_dirent64, d_name)
+		)
+	);
+
+	if (!py_name) {
+		return NULL;
+	}
+
+	return Py_BuildValue("KbO", d->d_ino, d->d_type, py_name);
+}
+
+static int getdents_exec(PyObject *module);
+
+static PyObject *
+getdents_new(PyTypeObject *type, PyObject *args, PyObject *Py_UNUSED(kwargs))
 {
 	size_t buff_size;
 	int fd;
 
-	if (!PyArg_ParseTuple(args, "in", &fd, &buff_size))
+	if (!PyArg_ParseTuple(args, "in", &fd, &buff_size)) {
 		return NULL;
+	}
 
 	if (!(fcntl(fd, F_GETFL) & O_DIRECTORY)) {
 		PyErr_SetString(
@@ -71,19 +140,27 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
 
 	struct getdents_state *state = (void *) tp_alloc(type, 0);
 
-	if (!state)
+	if (!state) {
 		return NULL;
+	}
 
 	void *buff = PyMem_Malloc(buff_size);
 
-	if (!buff)
+	if (!buff) {
+		Py_DECREF(state);
 		return PyErr_NoMemory();
+	}
 
 	state->buff = buff;
 	state->buff_size = buff_size;
 	state->fd = fd;
 	state->bpos = 0;
 	state->nread = 0;
+
+#ifdef Py_GIL_DISABLED
+	state->lock = (PyMutex){0};
+#endif
+
 	return (PyObject *) state;
 }
 
@@ -95,36 +172,87 @@ getdents_dealloc(struct getdents_state *state)
 
 	assert(tp_free != NULL);
 
-	PyMem_Free(state->buff);
+	if (state->buff) {
+		PyMem_Free(state->buff);
+	}
+
 	tp_free(state);
 	Py_DECREF(tp);
 }
 
 static PyObject *
-getdents_next(struct getdents_state *s)
+getdents_next(struct getdents_state *self)
 {
-	if (s->bpos >= s->nread) {
-		s->bpos = 0;
-		s->nread = syscall(SYS_getdents64, s->fd, s->buff, s->buff_size);
+	LOCK(self);
 
-		if (s->nread == 0)
+	if (!has_next(self)) {
+		_refill(self);
+
+		switch (self->nread) {
+		case 0:
+			UNLOCK(self);
 			return NULL;
-
-		if (s->nread == -1) {
+		case -1:
+			UNLOCK(self);
 			PyErr_SetString(PyExc_OSError, "getdents64");
 			return NULL;
 		}
 	}
 
-	struct linux_dirent64 *d = (struct linux_dirent64 *)(s->buff + s->bpos);
+	struct linux_dirent64 *dirent = _next(self);
 
-	PyObject *py_name = PyUnicode_DecodeFSDefault(d->d_name);
+	UNLOCK(self);
 
-	PyObject *result = Py_BuildValue("KbO", d->d_ino, d->d_type, py_name);
+	return dirent64_to_python(dirent);
+}
 
-	s->bpos += d->d_reclen;
+static PyObject *
+getdents_call(struct getdents_state *self, PyObject *Py_UNUSED(args), PyObject *Py_UNUSED(kwargs))
+{
+	LOCK(self);
 
-	return result;
+	if (!has_next(self)) {
+		_refill(self);
+
+		switch (self->nread) {
+		case 0:
+			UNLOCK(self);
+			return Py_None;
+		case -1:
+			UNLOCK(self);
+			PyErr_SetString(PyExc_OSError, "getdents64");
+			return NULL;
+		}
+	}
+
+	int count = _count(self);
+	PyObject *out = PyList_New(count);
+
+	if (!out) {
+		UNLOCK(self);
+		return NULL;
+	}
+
+	for (int i = 0; i < count; i++) {
+		PyObject *py_dirent = dirent64_to_python(_next(self));
+
+		if (!py_dirent) {
+			Py_DECREF(out);
+			UNLOCK(self);
+			return NULL;
+		}
+
+		if (PyList_SetItem(out, i, py_dirent) < 0) {
+			Py_DECREF(py_dirent);
+			Py_DECREF(out);
+			UNLOCK(self);
+			return NULL;
+		}
+	}
+
+	UNLOCK(self);
+
+	return out;
 }
 
 static PyType_Slot getdents_type_slots[] = {
@@ -133,6 +261,7 @@ static PyType_Slot getdents_type_slots[] = {
 	{Py_tp_iter, PyObject_SelfIter},
 	{Py_tp_iternext, getdents_next},
 	{Py_tp_new, getdents_new},
+	{Py_tp_call, getdents_call},
 	{0, 0},
 };
 
@@ -143,27 +272,45 @@ static PyType_Spec getdents_type_spec = {
 	.slots = getdents_type_slots,
 };
 
+PyModuleDef_Slot getdents_slots[] = {
+	{Py_mod_exec, getdents_exec},
+#if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 >= 0x030c0000
+	{Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+#endif
+#if !defined(Py_LIMITED_API) && defined(Py_GIL_DISABLED)
+	{Py_mod_gil, Py_MOD_GIL_NOT_USED},
+#endif
+	{0, NULL}
+};
+
 static struct PyModuleDef getdents_module = {
 	PyModuleDef_HEAD_INIT,
 	.m_name = "getdents",
 	.m_doc = "",
-	.m_size = -1,
+	.m_size = 0,
+	.m_slots = getdents_slots,
 };
 
 PyMODINIT_FUNC
 PyInit__getdents(void)
 {
-	PyObject *module = PyModule_Create(&getdents_module);
+	return PyModuleDef_Init(&getdents_module);
+}
 
-	if (!module)
-		return NULL;
-
+static int
+getdents_exec(PyObject *module)
+{
 	PyObject *getdents_raw = PyType_FromSpec(&getdents_type_spec);
 
-	if (!getdents_raw)
-		return NULL;
+	if (!getdents_raw) {
+		return -1;
+	}
 
-	PyModule_AddObject(module, "getdents_raw", getdents_raw);
+	if (PyModule_AddObject(module, "getdents_raw", getdents_raw) < 0) {
+		Py_DECREF(getdents_raw);
+		return -1;
+	}
+
 	PyModule_AddIntMacro(module, DT_BLK);
 	PyModule_AddIntMacro(module, DT_CHR);
 	PyModule_AddIntMacro(module, DT_DIR);
@@ -174,5 +321,6 @@ PyInit__getdents(void)
 	PyModule_AddIntMacro(module, DT_UNKNOWN);
 	PyModule_AddIntMacro(module, O_GETDENTS);
 	PyModule_AddIntMacro(module, MIN_GETDENTS_BUFF_SIZE);
-	return module;
+
+	return 0;
 }
