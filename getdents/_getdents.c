@@ -126,7 +126,22 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *Py_UNUSED(kwargs))
 		return NULL;
 	}
 
-	if (buff_size < MIN_GETDENTS_BUFF_SIZE) {
+	long name_max = fpathconf(fd, _PC_NAME_MAX);
+
+	if (name_max == -1) {
+		if (errno) {
+			PyErr_SetString(PyExc_OSError, "fpathconf");
+			return NULL;
+		} else {
+#ifdef NAME_MAX
+			name_max = NAME_MAX;
+#else
+			name_max = MAXNAMLEN;
+#endif
+		}
+	}
+
+	if (buff_size < (name_max + sizeof(struct linux_dirent64))) {
 		PyErr_SetString(
 			PyExc_ValueError,
 			"buff_size is too small"
