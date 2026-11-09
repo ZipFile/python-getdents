@@ -124,3 +124,35 @@ def test_getdents_call(fixt_dir: int) -> None:
         out.extend(dirents)
 
     assert sorted(out)
+
+
+def test_getdents_concurrent_mixed_access(fixt_dir: int, tmp_path: Path) -> None:
+    for i in range(256):
+        (tmp_path / f"entry{i}").touch()
+
+    iterator = getdents_raw(fixt_dir, MIN_GETDENTS_BUFF_SIZE)
+    event = Event()
+
+    def read_iterator() -> list[tuple[int, int, str]]:
+        event.wait()
+        return list(iterator)
+
+    def read_batches() -> list[tuple[int, int, str]]:
+        event.wait()
+        entries = []
+        while (batch := iterator()) is not None:
+            entries.extend(batch)
+        return entries
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        iterator_future = executor.submit(read_iterator)
+        batch_future = executor.submit(read_batches)
+        event.set()
+        entries = iterator_future.result() + batch_future.result()
+
+    names = [entry[2] for entry in entries]
+    expected_names = {".", "..", *(f"subdir{i}" for i in range(10))}
+    expected_names.update(f"entry{i}" for i in range(256))
+
+    assert len(names) == len(expected_names)
+    assert set(names) == expected_names

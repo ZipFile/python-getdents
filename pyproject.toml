@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools>=70.1"]
+requires = ["setuptools>=84.2.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "getdents"
@@ -8,7 +9,7 @@ authors = [
 ]
 description = "Python binding to linux syscall getdents64."
 readme = "README.rst"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 keywords = ["getdents"]
 license = "BSD-2-Clause"
 classifiers = [
@@ -65,7 +66,7 @@ max-line-length = 88
 
 [tool.black]
 line-length = 88
-target-version = ["py310", "py311", "py312", "py313"]
+target-version = ["py312", "py313", "py314", "py315"]
 
 [tool.mypy]
 strict = true
@@ -73,5 +74,8 @@ warn_unused_configs = true
 
 [tool.cibuildwheel]
 archs = ["native"]
+build = "cp312-* cp315t-*"
+# https://github.com/pypa/abi3audit/issues/215
+audit-command = ""
 test-command = "pytest --import-mode=importlib -p no:cacheprovider {project}/tests"
 test-requires = ["pytest", "pytest-cov"]
