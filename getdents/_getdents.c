@@ -3,13 +3,20 @@
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+
+// Relative offsets for __vectorcalloffset__ require Python 3.14.
+// See: https://docs.python.org/3.14/c-api/structures.html#c.PyMemberDef
+#if (defined(Py_TARGET_ABI3T) && Py_TARGET_ABI3T+0 >= 0x030e0000) || \
+    (defined(Py_LIMITED_API) && Py_LIMITED_API+0 >= 0x030e0000) || \
+    (!defined(Py_TARGET_ABI3T) && !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030e0000)
+# define GETDENTS_VECTORCALL 1
+#endif
 
 struct linux_dirent64 {
 	uint64_t        d_ino;
@@ -20,6 +27,9 @@ struct linux_dirent64 {
 };
 
 struct getdents_state {
+#ifdef GETDENTS_VECTORCALL
+	vectorcallfunc vectorcall;
+#endif
 	char  *buff;
 	int    bpos;
 	int    fd;
@@ -119,16 +129,53 @@ dirent64_to_python(struct linux_dirent64 *d)
 
 static int getdents_exec(PyObject *module);
 
+#ifdef Py_tp_vectorcall
+static PyObject *
+getdents_new_vectorcall(
+	PyObject *type,
+	PyObject *const *args,
+	size_t nargsf,
+	PyObject *Py_UNUSED(kwnames)
+)
+{
+	int fd;
+	Py_ssize_t buff_size;
+	Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+
+	if (nargs != 2) {
+		PyErr_Format(
+			PyExc_TypeError,
+			"getdents_raw() takes exactly 2 arguments (%zd given)",
+			nargs
+		);
+
+		return NULL;
+	}
+
+	if (!PyArg_Parse(args[0], "i", &fd) || !PyArg_Parse(args[1], "n", &buff_size)) {
+		return NULL;
+	}
+
+	return _getdents_new((PyTypeObject *)type, fd, buff_size);
+}
+#endif
+
 static PyObject *
 getdents_new(PyTypeObject *type, PyObject *args, PyObject *Py_UNUSED(kwargs))
 {
-	size_t buff_size;
+	Py_ssize_t buff_size;
 	int fd;
 
 	if (!PyArg_ParseTuple(args, "in", &fd, &buff_size)) {
 		return NULL;
 	}
 
+	return _getdents_new(type, fd, buff_size);
+}
+
+static PyObject *
+_getdents_new(PyTypeObject *type, int fd, Py_ssize_t buff_size)
+{
 	if (!(fcntl(fd, F_GETFL) & O_DIRECTORY)) {
 		PyErr_SetString(
 			PyExc_NotADirectoryError,
@@ -157,6 +204,9 @@ getdents_new(PyTypeObject *type, PyObject *args, PyObject *Py_UNUSED(kwargs))
 
 	struct getdents_state *state = PyObject_GetTypeData(object, type);
 
+#ifdef GETDENTS_VECTORCALL
+	state->vectorcall = getdents_vectorcall;
+#endif
 	state->buff = NULL;
 	state->buff_size = buff_size;
 	state->fd = fd;
@@ -248,7 +298,7 @@ getdents_next(PyObject *object)
 }
 
 static PyObject *
-getdents_call(PyObject *object, PyObject *Py_UNUSED(args), PyObject *Py_UNUSED(kwargs))
+_getdents_call(PyObject *object)
 {
 	struct getdents_state *self = getdents_get_state(object);
 
@@ -264,7 +314,7 @@ getdents_call(PyObject *object, PyObject *Py_UNUSED(args), PyObject *Py_UNUSED(k
 		switch (self->nread) {
 		case 0:
 			UNLOCK(self);
-			return Py_None;
+			Py_RETURN_NONE;
 		case -1:
 			UNLOCK(self);
 			PyErr_SetString(PyExc_OSError, "getdents64");
@@ -302,6 +352,39 @@ getdents_call(PyObject *object, PyObject *Py_UNUSED(args), PyObject *Py_UNUSED(k
 	return out;
 }
 
+static PyObject *
+getdents_call(
+	PyObject *object,
+	PyObject *Py_UNUSED(args),
+	PyObject *Py_UNUSED(kwargs)
+)
+{
+	return _getdents_call(object);
+}
+
+static PyObject *
+getdents_vectorcall(
+	PyObject *object,
+	PyObject *const *Py_UNUSED(args),
+	size_t Py_UNUSED(nargsf),
+	PyObject *Py_UNUSED(kwnames)
+)
+{
+	return _getdents_call(object);
+}
+
+#ifdef GETDENTS_VECTORCALL
+static PyMemberDef getdents_members[] = {
+	{
+		"__vectorcalloffset__",
+		Py_T_PYSSIZET,
+		offsetof(struct getdents_state, vectorcall),
+		Py_READONLY | Py_RELATIVE_OFFSET
+	},
+	{NULL},
+};
+#endif
+
 static PyType_Slot getdents_type_slots[] = {
 	{Py_tp_alloc, PyType_GenericAlloc},
 	{Py_tp_dealloc, getdents_dealloc},
@@ -309,13 +392,23 @@ static PyType_Slot getdents_type_slots[] = {
 	{Py_tp_iternext, getdents_next},
 	{Py_tp_new, getdents_new},
 	{Py_tp_call, getdents_call},
+#ifdef Py_tp_vectorcall
+	{Py_tp_vectorcall, getdents_new_vectorcall},
+#endif
+#ifdef GETDENTS_VECTORCALL
+	{Py_tp_members, getdents_members},
+#endif
 	{0, 0},
 };
 
 static PyType_Spec getdents_type_spec = {
 	.name = "getdents.getdents_raw",
 	.basicsize = -(int)sizeof(struct getdents_state),
-	.flags = Py_TPFLAGS_DEFAULT,
+#ifdef GETDENTS_VECTORCALL
+	.flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_VECTORCALL,
+#else
+	.flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE,
+#endif
 	.slots = getdents_type_slots,
 };
 

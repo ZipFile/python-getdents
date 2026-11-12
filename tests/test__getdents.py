@@ -56,6 +56,35 @@ def test_malloc_fail(fixt_dir: int) -> None:
         getdents_raw(fixt_dir, sys.maxsize)
 
 
+class TestConstructor:
+    def test_incomplete_args0(self) -> None:
+        with raises(TypeError):
+            getdents_raw()  # type: ignore[call-arg]
+
+    def test_incomplete_args1(self) -> None:
+        with raises(TypeError):
+            getdents_raw(0)
+
+    def test_invalid_fd(self) -> None:
+        with raises(TypeError):
+            getdents_raw("i", 1000)  # type: ignore[arg-type]
+
+    def test_invalid_buff_size(self) -> None:
+        with raises(TypeError):
+            getdents_raw(0, "i")  # type: ignore[arg-type]
+
+
+@mark.parametrize("name", ["__new__", "__init__", "custom_attribute"])
+class TestImmutability:
+    def test_setattr(self, name: str) -> None:
+        with raises(TypeError):
+            setattr(getdents_raw, name, lambda *args: None)
+
+    def test_delattr(self, name: str) -> None:
+        with raises(TypeError):
+            delattr(getdents_raw, name)
+
+
 def _assert_ordered(iterator: Iterable[tuple[int, int, str]]) -> None:
     iterator = iter(sorted(iterator, key=lambda d: d[2]))
 
